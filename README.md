@@ -11,6 +11,8 @@ A custom Kubernetes scheduler implementation that handles pod scheduling based o
 - ✅ Pod priority annotation parsing
 - ✅ Node capacity limits for test pods
 - ✅ Basic preemption framework
+- ✅ Basic bash scheduler deployment script. (please see .`/deploy-scheduler.sh`)
+
 
 ### Not Yet Implemented
 - ❌ Gang-scheduling
