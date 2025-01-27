@@ -82,42 +82,58 @@ class PriorityScheduler:
 
     def process_queue(self):
         """Process pods in priority order"""
+        # Create a list of all pods in queue for logging and processing
+        temp_queue = PriorityQueue()
+        pods_to_process = []
+        
+        # Get all pods from queue and sort by priority
         while not self.pod_queue.empty():
-            _, queue_item = self.pod_queue.get()
+            priority, queue_item = self.pod_queue.get()
+            pods_to_process.append((priority, queue_item))
+            
+        # Sort by priority (highest first) and timestamp
+        pods_to_process.sort(key=lambda x: (x[0], -x[1].timestamp))
+        
+        logger.info(f"Processing queue with {len(pods_to_process)} pods")
+        for pod_info in [f"{item[1].pod.metadata.name} (priority: {-item[0]})" for item in pods_to_process]:
+            logger.info(f"Queue contains: {pod_info}")
+            
+        # Process pods in priority order
+        for priority, queue_item in pods_to_process:
             pod = queue_item.pod
-
-            # Get list of nodes
             nodes = self.v1.list_node().items
-
-            # Score nodes and pick best one
             best_node = self.select_best_node(nodes, pod)
-
+            
             if best_node:
                 try:
                     self.bind_pod(pod, best_node.metadata.name)
                     logger.info(f"Successfully scheduled pod {pod.metadata.name} on node {best_node.metadata.name}")
+                    continue  # Skip putting back in queue
                 except client.rest.ApiException as e:
                     if e.status == 409:
                         logger.info(f"Pod {pod.metadata.name} was scheduled by another scheduler")
+                        continue  # Skip putting back in queue
                     else:
                         raise
-            else:
-                # Try to find a node where we can preempt lower priority pods
-                preemption_node = self.find_preemption_node(nodes, pod)
-                if preemption_node:
-                    logger.info(f"Found node {preemption_node.metadata.name} for preemption to schedule {pod.metadata.name}")
-                    self.perform_preemption(preemption_node, pod)
-                    # Try scheduling again after preemption
-                    try:
-                        self.bind_pod(pod, preemption_node.metadata.name)
-                        logger.info(f"Successfully scheduled pod {pod.metadata.name} on node {preemption_node.metadata.name} after preemption")
-                    except client.rest.ApiException as e:
-                        logger.error(f"Failed to schedule pod after preemption: {e}")
-                        self.pod_queue.put((-queue_item.priority, queue_item))
-                else:
-                    logger.warning(f"No suitable node found for pod {pod.metadata.name}, even with preemption")
-                    queue_item.timestamp = time.time()
-                    self.pod_queue.put((-queue_item.priority, queue_item))
+                        
+            # Try preemption if direct scheduling failed
+            preemption_node = self.find_preemption_node(nodes, pod)
+            if preemption_node:
+                logger.info(f"Found node {preemption_node.metadata.name} for preemption to schedule {pod.metadata.name}")
+                self.perform_preemption(preemption_node, pod)
+                try:
+                    self.bind_pod(pod, preemption_node.metadata.name)
+                    logger.info(f"Successfully scheduled pod {pod.metadata.name} on node {preemption_node.metadata.name} after preemption")
+                    continue  # Skip putting back in queue
+                except client.rest.ApiException as e:
+                    logger.error(f"Failed to schedule pod after preemption: {e}")
+            
+            # If we get here, we couldn't schedule the pod
+            logger.warning(f"Could not schedule pod {pod.metadata.name} - returning to queue")
+            temp_queue.put((priority, queue_item))
+            
+        # Restore unscheduled pods to the queue
+        self.pod_queue = temp_queue
 
     def select_best_node(self, nodes, pod):
         """Score nodes and select best one for the pod"""
