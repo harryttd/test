@@ -1,6 +1,11 @@
 import unittest
+import os
+import sys
 from unittest.mock import MagicMock, patch
-from scheduler import PriorityScheduler
+
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scheduler.scheduler import PriorityScheduler
 
 class TestPriorityScheduler(unittest.TestCase):
     def setUp(self):
