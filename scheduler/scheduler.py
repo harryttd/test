@@ -5,6 +5,7 @@ from queue import PriorityQueue
 from dataclasses import dataclass
 from typing import Optional
 import time
+import re
 
 @dataclass(order=True)
 class PodQueueItem:
@@ -115,6 +116,30 @@ class PriorityScheduler:
                 
         return best_node
 
+    def parse_k8s_resource(self, value):
+        """Convert Kubernetes resource values to base numeric values"""
+        if not value:
+            return 0
+        
+        # Handle CPU values like "100m" (millicores)
+        if isinstance(value, str) and value.endswith('m'):
+            return float(value[:-1]) / 1000
+            
+        # Handle memory values like "1Ki", "1Mi", "1Gi"
+        if isinstance(value, str):
+            match = re.match(r'^(\d+)(Ki|Mi|Gi)?$', value)
+            if match:
+                num = float(match.group(1))
+                unit = match.group(2)
+                if unit == 'Ki':
+                    return num * 1024
+                elif unit == 'Mi':
+                    return num * 1024 * 1024
+                elif unit == 'Gi':
+                    return num * 1024 * 1024 * 1024
+        
+        return float(value)
+
     def score_node(self, node, pod):
         """Score a node for pod placement"""
         score = 0
@@ -122,9 +147,10 @@ class PriorityScheduler:
         # Basic scoring based on available resources
         allocatable = node.status.allocatable
         if allocatable:
-            cpu_alloc = float(allocatable.get('cpu', 0))
-            mem_alloc = float(allocatable.get('memory', 0))
-            score += cpu_alloc + mem_alloc
+            cpu_alloc = self.parse_k8s_resource(allocatable.get('cpu', 0))
+            mem_alloc = self.parse_k8s_resource(allocatable.get('memory', 0))
+            # Normalize memory score by dividing by 1Gi to make it comparable to CPU
+            score += cpu_alloc + (mem_alloc / (1024 * 1024 * 1024))
             
         return score
 
