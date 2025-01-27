@@ -42,11 +42,13 @@ class PriorityScheduler:
                 self.v1.list_pod_for_all_namespaces, timeout_seconds=0
             ):
                 pod = event["object"]
+                logger.info(f"Received event type: {event['type']} for pod: {pod.metadata.name}")
+                
                 if event["type"] == "DELETED":
-                    # Remove pod from queue if it exists
-                    print("EVENT", event["type"])
+                    logger.info(f"Processing DELETE event for pod: {pod.metadata.name}")
                     self.remove_pod_from_queue(pod)
                 elif event["type"] in ["ADDED", "MODIFIED"]:
+                    logger.info(f"Processing {event['type']} event for pod: {pod.metadata.name}")
                     if (
                         pod.spec.scheduler_name == self.scheduler_name
                         and not pod.spec.node_name
@@ -169,7 +171,10 @@ class PriorityScheduler:
         # Create a temporary queue
         temp_queue = PriorityQueue()
         removed = False
-        print("DFSDFSDF", pod_to_remove.metadata.name)
+        queue_size = self.pod_queue.qsize()
+        
+        logger.info(f"Attempting to remove pod {pod_to_remove.metadata.name} from queue of size {queue_size}")
+        
         # Move all items except the one to remove
         while not self.pod_queue.empty():
             priority, queue_item = self.pod_queue.get()
