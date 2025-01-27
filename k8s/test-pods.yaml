@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: high-priority-pod
+  annotations:
+    scheduler.alpha.kubernetes.io/priority: "10"
+spec:
+  schedulerName: custom-scheduler
+  containers:
+  - name: nginx
+    image: nginx:latest
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: low-priority-pod
+  annotations:
+    scheduler.alpha.kubernetes.io/priority: "1"
+spec:
+  schedulerName: custom-scheduler
+  containers:
+  - name: nginx
+    image: nginx:latest
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
