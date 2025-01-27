@@ -1,21 +1,15 @@
-I'm taking an interactive k8s challenge for a job interview. Help me implement the following tasks step by step that I'm given:
+# Custom K8s Priority Scheduler Challenge
 
-# Description
-Write a custom secondary scheduler.
-We have X nodes. Over time we get new Pods.
-Each pod has a priority annotation.
+See SPEC.md for detailed technical specifications and requirements.
 
-# Tasks:
-- Setup a local k8s cluster with multiple nodes.
-  - For example, https://minikube.sigs.k8s.io/docs/tutorials/multi_node/
-- Write a scheduler
-  - See https://sebgoa.medium.com/kubernetes-scheduling-in-python-3588f4928b13
-- Assign the top X priority pods to nodes
-- Preempt
-- Gang-scheduling for jobs
-- When a job with multiple pods is assigned, all of its pods should be scheduled together, or none should.
-- Write some tests for this.
+## Quick Start
+1. Review the technical specifications in SPEC.md
+2. Follow the setup instructions to create your development environment
+3. Implement the scheduler according to the specifications
+4. Run the test suite to verify functionality
+5. Use the provided setup script to deploy to your target cluster
 
-# Expected delivery:
-- A script that sets up the scheduler on an existing k8s cluster, in a given namespace.
+## References
+- Minikube Multi-node Setup: https://minikube.sigs.k8s.io/docs/tutorials/multi_node/
+- K8s Python Scheduling Guide: https://sebgoa.medium.com/kubernetes-scheduling-in-python-3588f4928b13
 
