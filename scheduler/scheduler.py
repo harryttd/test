@@ -10,7 +10,7 @@ class PriorityScheduler:
             config.load_incluster_config()
         except config.ConfigException:
             config.load_kube_config()
-        
+
         self.v1 = client.CoreV1Api()
         self.scheduler_name = "custom-scheduler"
 
@@ -30,10 +30,10 @@ class PriorityScheduler:
         # Get pod priority from annotation
         priority = int(pod.metadata.annotations.get(
             'scheduler.alpha.kubernetes.io/priority', '0'))
-        
+
         # Get list of nodes
         nodes = self.v1.list_node().items
-        
+
         # Simple scheduling - just pick first Ready node
         # TODO: Implement proper priority and preemption logic
         for node in nodes:
@@ -41,7 +41,7 @@ class PriorityScheduler:
                 self.bind_pod(pod, node.metadata.name)
                 logger.info(f"Scheduled pod {pod.metadata.name} on node {node.metadata.name}")
                 return
-        
+
         logger.warning(f"No suitable node found for pod {pod.metadata.name}")
 
     def is_node_ready(self, node):
@@ -62,7 +62,7 @@ class PriorityScheduler:
                 name=node_name
             )
         )
-        
+
         self.v1.create_namespaced_binding(
             name=pod.metadata.name,
             namespace=pod.metadata.namespace,
