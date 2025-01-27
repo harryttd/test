@@ -102,10 +102,22 @@ class PriorityScheduler:
                     else:
                         raise
             else:
-                logger.warning(f"No suitable node found for pod {pod.metadata.name}")
-                # Put back in queue with small priority penalty
-                queue_item.timestamp = time.time()  # Update timestamp
-                self.pod_queue.put((-queue_item.priority, queue_item))
+                # Try to find a node where we can preempt lower priority pods
+                preemption_node = self.find_preemption_node(nodes, pod)
+                if preemption_node:
+                    logger.info(f"Found node {preemption_node.metadata.name} for preemption to schedule {pod.metadata.name}")
+                    self.perform_preemption(preemption_node, pod)
+                    # Try scheduling again after preemption
+                    try:
+                        self.bind_pod(pod, preemption_node.metadata.name)
+                        logger.info(f"Successfully scheduled pod {pod.metadata.name} on node {preemption_node.metadata.name} after preemption")
+                    except client.rest.ApiException as e:
+                        logger.error(f"Failed to schedule pod after preemption: {e}")
+                        self.pod_queue.put((-queue_item.priority, queue_item))
+                else:
+                    logger.warning(f"No suitable node found for pod {pod.metadata.name}, even with preemption")
+                    queue_item.timestamp = time.time()
+                    self.pod_queue.put((-queue_item.priority, queue_item))
 
     def select_best_node(self, nodes, pod):
         """Score nodes and select best one for the pod"""
@@ -223,6 +235,38 @@ class PriorityScheduler:
                     return node
                     
         return None
+
+    def perform_preemption(self, node, incoming_pod):
+        """Evict lower priority pods from the node"""
+        incoming_priority = int(incoming_pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
+        
+        # Get all priority pods on this node
+        field_selector = f'spec.nodeName={node.metadata.name},status.phase!=Failed,status.phase!=Succeeded'
+        pods = self.v1.list_pod_for_all_namespaces(field_selector=field_selector).items
+        priority_pods = [p for p in pods if 'priority' in p.metadata.name.lower()]
+        
+        # Sort pods by priority (lowest first)
+        priority_pods.sort(key=lambda p: int(p.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0")))
+        
+        for pod in priority_pods:
+            pod_priority = int(pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
+            if pod_priority < incoming_priority:
+                logger.info(f"Evicting lower priority pod {pod.metadata.name} ({pod_priority})")
+                try:
+                    self.v1.delete_namespaced_pod(
+                        name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        body=client.V1DeleteOptions(
+                            grace_period_seconds=0,
+                            propagation_policy='Foreground'
+                        )
+                    )
+                    logger.info(f"Successfully evicted pod {pod.metadata.name}")
+                except client.rest.ApiException as e:
+                    logger.error(f"Failed to evict pod {pod.metadata.name}: {e}")
+                    
+                # Wait a moment for the pod to be removed
+                time.sleep(1)
 
     def bind_pod(self, pod, node_name):
         target = client.V1ObjectReference(api_version="v1", kind="Node", name=node_name)
