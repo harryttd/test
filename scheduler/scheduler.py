@@ -72,7 +72,6 @@ class PriorityScheduler:
         )
 
         self.v1.create_namespaced_binding(
-            # name=pod.metadata.name,
             namespace=pod.metadata.namespace,
             body=binding
         )
