@@ -6,11 +6,6 @@ metadata:
     scheduler.alpha.kubernetes.io/priority: "10"
 spec:
   schedulerName: custom-scheduler
-  tolerations:
-    - key: "kubernetes.io/scheduling"
-      value: "custom"
-      operator: "Equal"
-      effect: "NoSchedule"
   containers:
     - name: nginx
       image: nginx:latest
@@ -30,11 +25,6 @@ metadata:
     scheduler.alpha.kubernetes.io/priority: "1"
 spec:
   schedulerName: custom-scheduler
-  tolerations:
-    - key: "kubernetes.io/scheduling"
-      value: "custom"
-      operator: "Equal"
-      effect: "NoSchedule"
   containers:
     - name: nginx
       image: nginx:latest
