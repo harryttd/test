@@ -33,6 +33,7 @@ class PriorityScheduler:
         self.v1 = client.CoreV1Api()
         self.scheduler_name = "custom-scheduler"
         self.pod_queue = PriorityQueue()
+        self.max_pods_per_node = 2  # Configure this as needed
 
     def run(self):
         logger.info("Starting custom scheduler...")
@@ -146,10 +147,21 @@ class PriorityScheduler:
 
         return float(value)
 
+    def get_node_pod_count(self, node_name):
+        """Get number of pods currently on the node"""
+        field_selector = f'spec.nodeName={node_name},status.phase!=Failed,status.phase!=Succeeded'
+        pods = self.v1.list_pod_for_all_namespaces(field_selector=field_selector).items
+        return len(pods)
+
     def score_node(self, node, pod):
         """Score a node for pod placement"""
-        score = 0
+        # Check pod count limit first
+        current_pod_count = self.get_node_pod_count(node.metadata.name)
+        if current_pod_count >= self.max_pods_per_node:
+            logger.info(f"Node {node.metadata.name} at pod limit ({current_pod_count}/{self.max_pods_per_node})")
+            return float('-inf')
 
+        score = 0
         # Basic scoring based on available resources
         allocatable = node.status.allocatable
         if allocatable:
