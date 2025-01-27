@@ -59,17 +59,18 @@ class PriorityScheduler:
         return False
 
     def bind_pod(self, pod, node_name):
+        print("Pod", node_name)
         target = client.V1ObjectReference(
             api_version="v1",
             kind="Node",
             name=node_name
         )
-        
+
         meta = client.V1ObjectMeta(
             name=pod.metadata.name,
             namespace=pod.metadata.namespace
         )
-        
+
         binding = client.V1Binding(
             metadata=meta,
             target=target
