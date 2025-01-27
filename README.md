@@ -43,6 +43,13 @@ Currently using test pods with different priority levels (40-200) to verify sche
 3. Implement gang-scheduling
 4. Add comprehensive test suite
 5. Add performance tests
+6. Create Helm chart with configurable values:
+   - Max pods per node
+   - Scheduler name
+   - Resource limits/requests
+   - Priority thresholds
+   - Namespace configuration
+   - RBAC settings
 
 ## Development Setup
 
