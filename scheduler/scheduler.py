@@ -42,8 +42,11 @@ class PriorityScheduler:
                 self.v1.list_pod_for_all_namespaces, timeout_seconds=0
             ):
                 event
-                if event["type"] == "ADDED" or event["type"] == "MODIFIED":
-                    pod = event["object"]
+                pod = event["object"]
+                if event["type"] == "DELETED":
+                    # Remove pod from queue if it exists
+                    self.remove_pod_from_queue(pod)
+                elif event["type"] in ["ADDED", "MODIFIED"]:
                     if (
                         pod.spec.scheduler_name == self.scheduler_name
                         and not pod.spec.node_name
@@ -160,6 +163,26 @@ class PriorityScheduler:
             if condition.type == "Ready" and condition.status == "True":
                 return True
         return False
+
+    def remove_pod_from_queue(self, pod_to_remove):
+        """Remove a specific pod from the priority queue"""
+        # Create a temporary queue
+        temp_queue = PriorityQueue()
+        removed = False
+        
+        # Move all items except the one to remove
+        while not self.pod_queue.empty():
+            priority, queue_item = self.pod_queue.get()
+            if (queue_item.pod.metadata.name != pod_to_remove.metadata.name or 
+                queue_item.pod.metadata.namespace != pod_to_remove.metadata.namespace):
+                temp_queue.put((priority, queue_item))
+            else:
+                removed = True
+                logger.info(f"Removed pod {pod_to_remove.metadata.name} from scheduling queue")
+        
+        # Restore the queue
+        self.pod_queue = temp_queue
+        return removed
 
     def bind_pod(self, pod, node_name):
         target = client.V1ObjectReference(api_version="v1", kind="Node", name=node_name)
