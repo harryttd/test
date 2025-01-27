@@ -220,37 +220,37 @@ class PriorityScheduler:
     def find_preemption_node(self, nodes, incoming_pod):
         """Find a node where we can preempt lower priority pods"""
         incoming_priority = int(incoming_pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
-        
+
         for node in nodes:
             if not self.is_node_ready(node):
                 continue
-                
+
             # Get all priority pods on this node
             field_selector = f'spec.nodeName={node.metadata.name},status.phase!=Failed,status.phase!=Succeeded'
             pods = self.v1.list_pod_for_all_namespaces(field_selector=field_selector).items
             priority_pods = [p for p in pods if 'priority' in p.metadata.name.lower()]
-            
+
             # Check if any pods have lower priority
             for pod in priority_pods:
                 pod_priority = int(pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
                 if pod_priority < incoming_priority:
                     logger.info(f"Found lower priority pod {pod.metadata.name} ({pod_priority}) on node {node.metadata.name}")
                     return node
-                    
+
         return None
 
     def perform_preemption(self, node, incoming_pod):
         """Evict lower priority pods from the node"""
         incoming_priority = int(incoming_pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
-        
+
         # Get all priority pods on this node
         field_selector = f'spec.nodeName={node.metadata.name},status.phase!=Failed,status.phase!=Succeeded'
         pods = self.v1.list_pod_for_all_namespaces(field_selector=field_selector).items
         priority_pods = [p for p in pods if 'priority' in p.metadata.name.lower()]
-        
+
         # Sort pods by priority (lowest first)
         priority_pods.sort(key=lambda p: int(p.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0")))
-        
+
         for pod in priority_pods:
             pod_priority = int(pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
             if pod_priority < incoming_priority:
@@ -267,7 +267,7 @@ class PriorityScheduler:
                     logger.info(f"Successfully evicted pod {pod.metadata.name}")
                 except client.rest.ApiException as e:
                     logger.error(f"Failed to evict pod {pod.metadata.name}: {e}")
-                    
+
                 # Wait a moment for the pod to be removed
                 time.sleep(1)
 

@@ -73,3 +73,41 @@ spec:
         limits:
           memory: "128Mi"
           cpu: "500m"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: priority-pod-45
+  annotations:
+    scheduler.alpha.kubernetes.io/priority: "45"
+spec:
+  schedulerName: custom-scheduler
+  containers:
+    - name: nginx
+      image: nginx:latest
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: priority-pod-200
+  annotations:
+    scheduler.alpha.kubernetes.io/priority: "200"
+spec:
+  schedulerName: custom-scheduler
+  containers:
+    - name: nginx
+      image: nginx:latest
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
