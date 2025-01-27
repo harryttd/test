@@ -46,8 +46,10 @@ class PriorityScheduler:
                 logger.info(f"Received event type: {event['type']} for pod: {pod.metadata.name}")
 
                 if event["type"] == "DELETED":
-                    # logger.info(f"Processing DELETE event for pod: {pod.metadata.name}")
+                    logger.info(f"Processing DELETE event for pod: {pod.metadata.name}")
                     self.remove_pod_from_queue(pod)
+                    # Process queue after pod deletion in case lower priority pods can now be scheduled
+                    self.process_queue()
                 elif event["type"] in ["ADDED", "MODIFIED"]:
                     # logger.info(f"Processing {event['type']} event for pod: {pod.metadata.name}")
                     if (
