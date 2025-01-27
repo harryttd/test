@@ -1,0 +1,20 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Development files
+.git
+.gitignore
+.pytest_cache/
+*.log
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+
+# Test files
+test_*.py
