@@ -12,23 +12,11 @@ A custom Kubernetes scheduler implementation that handles pod scheduling based o
 - ✅ Node capacity limits for test pods
 - ✅ Basic preemption framework
 
-### In Progress
-- 🚧 Preemption Logic
-  - Cross-node preemption working - finds and evicts lowest priority pod across all nodes
-  - Known bug: When max_pods_per_node is reached, scheduler won't preempt lower priority pods even if a higher priority pod is waiting
-  - Need to modify node scoring to consider preemption when at pod limit
-- 🚧 Resource tracking and allocation
-
 ### Not Yet Implemented
 - ❌ Gang-scheduling
 - ❌ Priority updates handling
 - ❌ Comprehensive test suite
 - ❌ Performance testing
-
-## Current Limitations
-1. Priority Handling: While we parse priority annotations, the scheduler may not always respect priorities strictly during node assignment
-2. Preemption: Basic framework exists but needs improvement to properly handle priority-based evictions
-3. Resource Management: Basic resource checking implemented but needs refinement
 
 ## Testing
 Currently using test pods with different priority levels (40-200) to verify scheduling behavior.
@@ -38,12 +26,10 @@ Currently using test pods with different priority levels (40-200) to verify sche
 - `k8s/test-multiple-pods.yaml`: Extended test with multiple priority levels
 
 ## Next Steps
-1. Fix preemption bug when nodes are at max pod limit
-2. Improve node scoring to consider preemption possibilities
-3. Implement gang-scheduling
-4. Add comprehensive test suite
-5. Add performance tests
-6. Create Helm chart with configurable values:
+1. Implement gang-scheduling
+2. Add comprehensive test suite
+3. Add performance tests
+4. Create Helm chart with configurable values:
    - Max pods per node
    - Scheduler name
    - Resource limits/requests
@@ -81,6 +67,3 @@ Watch scheduler logs:
 ```bash
 kubectl -n kube-system logs -f -l app=custom-scheduler
 ```
-
-## Contributing
-Please see SPEC.md for detailed technical specifications and requirements.
