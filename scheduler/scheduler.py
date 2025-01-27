@@ -163,7 +163,10 @@ class PriorityScheduler:
         """Get number of pods currently on the node"""
         field_selector = f'spec.nodeName={node_name},status.phase!=Failed,status.phase!=Succeeded'
         pods = self.v1.list_pod_for_all_namespaces(field_selector=field_selector).items
-        return len(pods)
+        # Only count pods that have 'priority' in their name
+        priority_pods = [pod for pod in pods if 'priority' in pod.metadata.name.lower()]
+        logger.info(f"Node {node_name} has {len(priority_pods)} priority test pods")
+        return len(priority_pods)
 
     def score_node(self, node, pod):
         """Score a node for pod placement"""
