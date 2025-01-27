@@ -4,6 +4,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class PriorityScheduler:
     def __init__(self):
         try:
@@ -18,18 +19,26 @@ class PriorityScheduler:
         logger.info("Starting custom scheduler...")
         w = watch.Watch()
         try:
-            for event in w.stream(self.v1.list_pod_for_all_namespaces, timeout_seconds=0):
+            for event in w.stream(
+                self.v1.list_pod_for_all_namespaces, timeout_seconds=0
+            ):
                 event
-                if event['type'] == 'ADDED' or event['type'] == 'MODIFIED':
-                    pod = event['object']
-                    if (pod.spec.scheduler_name == self.scheduler_name and
-                        not pod.spec.node_name and
-                        pod.status.phase == "Pending"):
+                if event["type"] == "ADDED" or event["type"] == "MODIFIED":
+                    pod = event["object"]
+                    if (
+                        pod.spec.scheduler_name == self.scheduler_name
+                        and not pod.spec.node_name
+                        and pod.status.phase == "Pending"
+                    ):
                         try:
-                            logger.info(f"Attempting to schedule pod: {pod.metadata.namespace}/{pod.metadata.name}")
+                            logger.info(
+                                f"Attempting to schedule pod: {pod.metadata.namespace}/{pod.metadata.name}"
+                            )
                             self.schedule_pod(pod)
                         except Exception as e:
-                            logger.error(f"Error scheduling pod {pod.metadata.namespace}/{pod.metadata.name}: {e}")
+                            logger.error(
+                                f"Error scheduling pod {pod.metadata.namespace}/{pod.metadata.name}: {e}"
+                            )
         except Exception as e:
             logger.error(f"Watch failed: {e}")
             raise
@@ -37,12 +46,15 @@ class PriorityScheduler:
     def schedule_pod(self, pod):
         # Skip if pod is already scheduled
         if pod.spec.node_name:
-            logger.info(f"Pod {pod.metadata.name} is already scheduled to {pod.spec.node_name}")
+            logger.info(
+                f"Pod {pod.metadata.name} is already scheduled to {pod.spec.node_name}"
+            )
             return
 
         # Get pod priority from annotation
-        priority = int(pod.metadata.annotations.get(
-            'scheduler.alpha.kubernetes.io/priority', '0'))
+        priority = int(
+            pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0")
+        )
 
         # Get list of nodes
         nodes = self.v1.list_node().items
@@ -53,11 +65,15 @@ class PriorityScheduler:
             if self.is_node_ready(node):
                 try:
                     self.bind_pod(pod, node.metadata.name)
-                    logger.info(f"Successfully scheduled pod {pod.metadata.name} on node {node.metadata.name}")
+                    logger.info(
+                        f"Successfully scheduled pod {pod.metadata.name} on node {node.metadata.name}"
+                    )
                     return
                 except client.rest.ApiException as e:
                     if e.status == 409:  # Conflict
-                        logger.info(f"Pod {pod.metadata.name} was scheduled by another scheduler")
+                        logger.info(
+                            f"Pod {pod.metadata.name} was scheduled by another scheduler"
+                        )
                         return
                     raise
 
@@ -70,27 +86,22 @@ class PriorityScheduler:
         return False
 
     def bind_pod(self, pod, node_name):
-        target = client.V1ObjectReference(
-            api_version="v1",
-            kind="Node",
-            name=node_name
-        )
+        target = client.V1ObjectReference(api_version="v1", kind="Node", name=node_name)
 
         meta = client.V1ObjectMeta(
-            name=pod.metadata.name,
-            namespace=pod.metadata.namespace
+            name=pod.metadata.name, namespace=pod.metadata.namespace
         )
 
-        binding = client.V1Binding(
-            metadata=meta,
-            target=target
-        )
+        binding = client.V1Binding(metadata=meta, target=target)
 
         logger.info(f"Binding pod {pod.metadata.name} to node {node_name}")
         self.v1.create_namespaced_binding(
             namespace=pod.metadata.namespace,
-            body=binding
+            body=binding,
+            # https://github.com/kubernetes-client/python/issues/825
+            _preload_content=False
         )
+
 
 if __name__ == "__main__":
     scheduler = PriorityScheduler()
