@@ -14,9 +14,9 @@ A custom Kubernetes scheduler implementation that handles pod scheduling based o
 
 ### In Progress
 - 🚧 Preemption Logic
-  - Currently has basic structure but priority handling needs improvement
-  - Lower priority pods can still get scheduled before higher priority ones in some cases
-  - Need to implement proper priority queue ordering during node assignment
+  - Cross-node preemption working - finds and evicts lowest priority pod across all nodes
+  - Known bug: When max_pods_per_node is reached, scheduler won't preempt lower priority pods even if a higher priority pod is waiting
+  - Need to modify node scoring to consider preemption when at pod limit
 - 🚧 Resource tracking and allocation
 
 ### Not Yet Implemented
@@ -38,8 +38,8 @@ Currently using test pods with different priority levels (40-200) to verify sche
 - `k8s/test-multiple-pods.yaml`: Extended test with multiple priority levels
 
 ## Next Steps
-1. Fix priority handling to ensure strict priority ordering
-2. Improve preemption logic
+1. Fix preemption bug when nodes are at max pod limit
+2. Improve node scoring to consider preemption possibilities
 3. Implement gang-scheduling
 4. Add comprehensive test suite
 5. Add performance tests
