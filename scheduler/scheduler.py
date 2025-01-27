@@ -15,16 +15,23 @@ class PriorityScheduler:
         self.scheduler_name = "custom-scheduler"
 
     def run(self):
+        logger.info("Starting custom scheduler...")
         w = watch.Watch()
-        for event in w.stream(self.v1.list_pod_for_all_namespaces, timeout_seconds=0):
-            pod = event['object']
-            if pod.spec.scheduler_name == self.scheduler_name and \
-               not pod.spec.node_name and \
-               pod.status.phase == "Pending":
-                try:
-                    self.schedule_pod(pod)
-                except Exception as e:
-                    logger.error(f"Error scheduling pod {pod.metadata.name}: {e}")
+        try:
+            for event in w.stream(self.v1.list_pod_for_all_namespaces, timeout_seconds=0):
+                if event['type'] == 'ADDED' or event['type'] == 'MODIFIED':
+                    pod = event['object']
+                    if (pod.spec.scheduler_name == self.scheduler_name and 
+                        not pod.spec.node_name and 
+                        pod.status.phase == "Pending"):
+                        try:
+                            logger.info(f"Attempting to schedule pod: {pod.metadata.namespace}/{pod.metadata.name}")
+                            self.schedule_pod(pod)
+                        except Exception as e:
+                            logger.error(f"Error scheduling pod {pod.metadata.namespace}/{pod.metadata.name}: {e}")
+        except Exception as e:
+            logger.error(f"Watch failed: {e}")
+            raise
 
     def schedule_pod(self, pod):
         # Get pod priority from annotation
