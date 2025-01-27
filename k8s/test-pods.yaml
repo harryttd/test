@@ -26,9 +26,8 @@ metadata:
 spec:
   schedulerName: custom-scheduler
   tolerations:
-    - key: "scheduler"
-      operator: "Equal"
-      value: "custom"
+    - key: "custom-scheduler"
+      operator: "Exists"
       effect: "NoSchedule"
   containers:
     - name: nginx
