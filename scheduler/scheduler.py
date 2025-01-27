@@ -1,5 +1,6 @@
 from kubernetes import client, config, watch
 import logging
+import traceback
 from queue import PriorityQueue
 from dataclasses import dataclass
 from typing import Optional
@@ -54,10 +55,11 @@ class PriorityScheduler:
                             self.schedule_pod(pod)
                         except Exception as e:
                             logger.error(
-                                f"Error scheduling pod {pod.metadata.namespace}/{pod.metadata.name}: {e}"
+                                f"Error scheduling pod {pod.metadata.namespace}/{pod.metadata.name}: {e}\n"
+                                f"Stack trace:\n{traceback.format_exc()}"
                             )
         except Exception as e:
-            logger.error(f"Watch failed: {e}")
+            logger.error(f"Watch failed: {e}\nStack trace:\n{traceback.format_exc()}")
             raise
 
     def schedule_pod(self, pod):
