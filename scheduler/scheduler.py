@@ -35,6 +35,11 @@ class PriorityScheduler:
             raise
 
     def schedule_pod(self, pod):
+        # Skip if pod is already scheduled
+        if pod.spec.node_name:
+            logger.info(f"Pod {pod.metadata.name} is already scheduled to {pod.spec.node_name}")
+            return
+
         # Get pod priority from annotation
         priority = int(pod.metadata.annotations.get(
             'scheduler.alpha.kubernetes.io/priority', '0'))
@@ -46,9 +51,15 @@ class PriorityScheduler:
         # TODO: Implement proper priority and preemption logic
         for node in nodes:
             if self.is_node_ready(node):
-                self.bind_pod(pod, node.metadata.name)
-                logger.info(f"Scheduled pod {pod.metadata.name} on node {node.metadata.name}")
-                return
+                try:
+                    self.bind_pod(pod, node.metadata.name)
+                    logger.info(f"Successfully scheduled pod {pod.metadata.name} on node {node.metadata.name}")
+                    return
+                except client.rest.ApiException as e:
+                    if e.status == 409:  # Conflict
+                        logger.info(f"Pod {pod.metadata.name} was scheduled by another scheduler")
+                        return
+                    raise
 
         logger.warning(f"No suitable node found for pod {pod.metadata.name}")
 
@@ -59,7 +70,6 @@ class PriorityScheduler:
         return False
 
     def bind_pod(self, pod, node_name):
-        print("Pod", node_name)
         target = client.V1ObjectReference(
             api_version="v1",
             kind="Node",
