@@ -70,6 +70,7 @@ class PriorityScheduler:
 
         # Add pod to priority queue instead of immediate scheduling
         queue_item = PodQueueItem(pod)
+        logger.info(f"Processing pod {pod.metadata.name} with priority {queue_item.priority}")
         self.pod_queue.put((-queue_item.priority, queue_item))  # Negative for highest-first
         self.process_queue()
 

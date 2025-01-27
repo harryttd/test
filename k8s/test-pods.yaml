@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: high-priority-pod
   annotations:
-    scheduler.alpha.kubernetes.io/priority: "10"
+    scheduler.alpha.kubernetes.io/priority: "100"
 spec:
   schedulerName: custom-scheduler
   containers:
@@ -22,7 +22,7 @@ kind: Pod
 metadata:
   name: low-priority-pod
   annotations:
-    scheduler.alpha.kubernetes.io/priority: "1"
+    scheduler.alpha.kubernetes.io/priority: "10"
 spec:
   schedulerName: custom-scheduler
   containers:
