@@ -19,10 +19,11 @@ class PriorityScheduler:
         w = watch.Watch()
         try:
             for event in w.stream(self.v1.list_pod_for_all_namespaces, timeout_seconds=0):
+                event
                 if event['type'] == 'ADDED' or event['type'] == 'MODIFIED':
                     pod = event['object']
-                    if (pod.spec.scheduler_name == self.scheduler_name and 
-                        not pod.spec.node_name and 
+                    if (pod.spec.scheduler_name == self.scheduler_name and
+                        not pod.spec.node_name and
                         pod.status.phase == "Pending"):
                         try:
                             logger.info(f"Attempting to schedule pod: {pod.metadata.namespace}/{pod.metadata.name}")
@@ -71,7 +72,7 @@ class PriorityScheduler:
         )
 
         self.v1.create_namespaced_binding(
-            name=pod.metadata.name,
+            # name=pod.metadata.name,
             namespace=pod.metadata.namespace,
             body=binding
         )
