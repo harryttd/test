@@ -42,9 +42,25 @@ Currently using test pods with different priority levels (40-200) to verify sche
 ## Development Setup
 
 ### Prerequisites
-- Minikube with multiple nodes
+- Docker Desktop
+- Minikube with Docker driver
 - Python 3.8+
 - kubectl configured for your cluster
+
+### Local Registry Setup
+This project uses a local container registry for development. Follow these steps:
+
+1. Start Minikube with Docker driver:
+```bash
+minikube start --driver=docker --nodes=2
+```
+
+2. Enable the registry addon:
+```bash
+minikube addons enable registry
+```
+
+See [Minikube Registry Guide](https://minikube.sigs.k8s.io/docs/handbook/registry/) for detailed setup instructions.
 
 ### Quick Start
 1. Build the scheduler:
