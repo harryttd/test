@@ -47,5 +47,5 @@ spec:
       serviceAccountName: custom-scheduler
       containers:
       - name: custom-scheduler
-        image: custom-scheduler:latest
-        imagePullPolicy: Never
+        image: localhost:5000/custom-scheduler
+        imagePullPolicy: Always
