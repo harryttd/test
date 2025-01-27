@@ -1,5 +1,21 @@
 from kubernetes import client, config, watch
 import logging
+from queue import PriorityQueue
+from dataclasses import dataclass
+from typing import Optional
+import time
+
+@dataclass(order=True)
+class PodQueueItem:
+    priority: int
+    timestamp: float  # For FIFO ordering of same-priority pods
+    pod: Optional[client.V1Pod] = None
+    
+    def __init__(self, pod: client.V1Pod):
+        self.pod = pod
+        self.priority = int(pod.metadata.annotations.get(
+            "scheduler.alpha.kubernetes.io/priority", "0"))
+        self.timestamp = time.time()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,6 +30,7 @@ class PriorityScheduler:
 
         self.v1 = client.CoreV1Api()
         self.scheduler_name = "custom-scheduler"
+        self.pod_queue = PriorityQueue()
 
     def run(self):
         logger.info("Starting custom scheduler...")
@@ -44,40 +61,70 @@ class PriorityScheduler:
             raise
 
     def schedule_pod(self, pod):
-        # Skip if pod is already scheduled
         if pod.spec.node_name:
-            logger.info(
-                f"Pod {pod.metadata.name} is already scheduled to {pod.spec.node_name}"
-            )
+            logger.info(f"Pod {pod.metadata.name} is already scheduled to {pod.spec.node_name}")
             return
 
-        # Get pod priority from annotation
-        priority = int(
-            pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0")
-        )
+        # Add pod to priority queue instead of immediate scheduling
+        queue_item = PodQueueItem(pod)
+        self.pod_queue.put((-queue_item.priority, queue_item))  # Negative for highest-first
+        self.process_queue()
 
-        # Get list of nodes
-        nodes = self.v1.list_node().items
-
-        # Simple scheduling - just pick first Ready node
-        # TODO: Implement proper priority and preemption logic
-        for node in nodes:
-            if self.is_node_ready(node):
+    def process_queue(self):
+        """Process pods in priority order"""
+        while not self.pod_queue.empty():
+            _, queue_item = self.pod_queue.get()
+            pod = queue_item.pod
+            
+            # Get list of nodes
+            nodes = self.v1.list_node().items
+            
+            # Score nodes and pick best one
+            best_node = self.select_best_node(nodes, pod)
+            
+            if best_node:
                 try:
-                    self.bind_pod(pod, node.metadata.name)
-                    logger.info(
-                        f"Successfully scheduled pod {pod.metadata.name} on node {node.metadata.name}"
-                    )
-                    return
+                    self.bind_pod(pod, best_node.metadata.name)
+                    logger.info(f"Successfully scheduled pod {pod.metadata.name} on node {best_node.metadata.name}")
                 except client.rest.ApiException as e:
-                    if e.status == 409:  # Conflict
-                        logger.info(
-                            f"Pod {pod.metadata.name} was scheduled by another scheduler"
-                        )
-                        return
-                    raise
+                    if e.status == 409:
+                        logger.info(f"Pod {pod.metadata.name} was scheduled by another scheduler")
+                    else:
+                        raise
+            else:
+                logger.warning(f"No suitable node found for pod {pod.metadata.name}")
+                # Put back in queue with small priority penalty
+                queue_item.timestamp = time.time()  # Update timestamp
+                self.pod_queue.put((-queue_item.priority, queue_item))
 
-        logger.warning(f"No suitable node found for pod {pod.metadata.name}")
+    def select_best_node(self, nodes, pod):
+        """Score nodes and select best one for the pod"""
+        best_score = float('-inf')
+        best_node = None
+        
+        for node in nodes:
+            if not self.is_node_ready(node):
+                continue
+                
+            score = self.score_node(node, pod)
+            if score > best_score:
+                best_score = score
+                best_node = node
+                
+        return best_node
+
+    def score_node(self, node, pod):
+        """Score a node for pod placement"""
+        score = 0
+        
+        # Basic scoring based on available resources
+        allocatable = node.status.allocatable
+        if allocatable:
+            cpu_alloc = float(allocatable.get('cpu', 0))
+            mem_alloc = float(allocatable.get('memory', 0))
+            score += cpu_alloc + mem_alloc
+            
+        return score
 
     def is_node_ready(self, node):
         for condition in node.status.conditions:
