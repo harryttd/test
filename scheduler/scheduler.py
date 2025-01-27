@@ -217,59 +217,62 @@ class PriorityScheduler:
         self.pod_queue = temp_queue
         return removed
 
-    def find_preemption_node(self, nodes, incoming_pod):
-        """Find a node where we can preempt lower priority pods"""
-        incoming_priority = int(incoming_pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
+    def find_lowest_priority_pod(self, nodes, incoming_priority):
+        """Find the lowest priority pod across all nodes"""
+        lowest_priority = incoming_priority
+        lowest_pod = None
+        lowest_pod_node = None
 
         for node in nodes:
             if not self.is_node_ready(node):
                 continue
 
-            # Get all priority pods on this node
             field_selector = f'spec.nodeName={node.metadata.name},status.phase!=Failed,status.phase!=Succeeded'
             pods = self.v1.list_pod_for_all_namespaces(field_selector=field_selector).items
             priority_pods = [p for p in pods if 'priority' in p.metadata.name.lower()]
 
-            # Check if any pods have lower priority
             for pod in priority_pods:
                 pod_priority = int(pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
-                if pod_priority < incoming_priority:
-                    logger.info(f"Found lower priority pod {pod.metadata.name} ({pod_priority}) on node {node.metadata.name}")
-                    return node
+                if pod_priority < lowest_priority:
+                    lowest_priority = pod_priority
+                    lowest_pod = pod
+                    lowest_pod_node = node
+                    logger.info(f"Found new lowest priority pod {pod.metadata.name} ({pod_priority}) on node {node.metadata.name}")
+
+        return lowest_pod, lowest_pod_node
+
+    def find_preemption_node(self, nodes, incoming_pod):
+        """Find a node where we can preempt lower priority pods"""
+        incoming_priority = int(incoming_pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
+        lowest_pod, node = self.find_lowest_priority_pod(nodes, incoming_priority)
+        
+        if lowest_pod:
+            logger.info(f"Selected lowest priority pod {lowest_pod.metadata.name} on node {node.metadata.name} for preemption")
+            return node
 
         return None
 
     def perform_preemption(self, node, incoming_pod):
-        """Evict lower priority pods from the node"""
+        """Evict the lowest priority pod from the node"""
         incoming_priority = int(incoming_pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
+        lowest_pod, _ = self.find_lowest_priority_pod([node], incoming_priority)
 
-        # Get all priority pods on this node
-        field_selector = f'spec.nodeName={node.metadata.name},status.phase!=Failed,status.phase!=Succeeded'
-        pods = self.v1.list_pod_for_all_namespaces(field_selector=field_selector).items
-        priority_pods = [p for p in pods if 'priority' in p.metadata.name.lower()]
-
-        # Sort pods by priority (lowest first)
-        priority_pods.sort(key=lambda p: int(p.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0")))
-
-        for pod in priority_pods:
-            pod_priority = int(pod.metadata.annotations.get("scheduler.alpha.kubernetes.io/priority", "0"))
-            if pod_priority < incoming_priority:
-                logger.info(f"Evicting lower priority pod {pod.metadata.name} ({pod_priority})")
-                try:
-                    self.v1.delete_namespaced_pod(
-                        name=pod.metadata.name,
-                        namespace=pod.metadata.namespace,
-                        body=client.V1DeleteOptions(
-                            grace_period_seconds=0,
-                            propagation_policy='Foreground'
-                        )
+        if lowest_pod:
+            logger.info(f"Evicting lowest priority pod {lowest_pod.metadata.name}")
+            try:
+                self.v1.delete_namespaced_pod(
+                    name=lowest_pod.metadata.name,
+                    namespace=lowest_pod.metadata.namespace,
+                    body=client.V1DeleteOptions(
+                        grace_period_seconds=0,
+                        propagation_policy='Foreground'
                     )
-                    logger.info(f"Successfully evicted pod {pod.metadata.name}")
-                except client.rest.ApiException as e:
-                    logger.error(f"Failed to evict pod {pod.metadata.name}: {e}")
-
+                )
+                logger.info(f"Successfully evicted pod {lowest_pod.metadata.name}")
                 # Wait a moment for the pod to be removed
                 time.sleep(1)
+            except client.rest.ApiException as e:
+                logger.error(f"Failed to evict pod {lowest_pod.metadata.name}: {e}")
 
     def bind_pod(self, pod, node_name):
         target = client.V1ObjectReference(api_version="v1", kind="Node", name=node_name)
